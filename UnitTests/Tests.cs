@@ -1,8 +1,8 @@
-using Storage;
+using System.Net;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
-using Microsoft.EntityFrameworkCore;
-using System.Net;
+using Storage;
 
 namespace UnitTests
 {
@@ -42,13 +42,19 @@ namespace UnitTests
         private readonly WebAppFactory _webApp = new WebAppFactory();
 
 
-        [TestMethod]
-        public async Task UploadImageShouldReturnBadRequestWhenTargetDimensionsInvalid()
+        [DataTestMethod]
+        [DataRow("0", "100", false)]
+        [DataRow("100", "0", false)]
+        [DataRow("0", "0", true)]
+        public async Task UploadImageShouldReturnBadRequestWhenTargetDimensionsInvalid(string targetWidth, string targetHeight, bool keepAspectRatio)
         {
             var client = _webApp.CreateClient();
             var content = new MultipartFormDataContent
             {
                 { new StringContent("png"), "targetFormat" },
+                { new StringContent(targetWidth), "targetWidth" },
+                { new StringContent(targetHeight), "targetHeight" },
+                { new StringContent(keepAspectRatio.ToString()), "keepAspectRatio" },
                 { new StreamContent(new MemoryStream(TestPngImage)), "imageFile", "test.png" }
             };
 
@@ -89,15 +95,20 @@ namespace UnitTests
         }
 
 
-        [TestMethod]
-        public async Task UploadImageShouldSaveToDatabase()
+        [DataTestMethod]
+        [DataRow("100", "100", false)]
+        [DataRow("100", "100", true)]
+        [DataRow("100", "0", true)]
+        [DataRow("0", "100", true)]
+        public async Task UploadImageShouldSaveToDatabase(string targetWidth, string targetHeight, bool keepAspectRatio)
         {
             var client = _webApp.CreateClient();
             var content = new MultipartFormDataContent
             {
                 { new StringContent("png"), "targetFormat" },
-                { new StringContent("100"), "targetWidth" },
-                { new StringContent("100"), "targetHeight" },
+                { new StringContent(targetWidth), "targetWidth" },
+                { new StringContent(targetHeight), "targetHeight" },
+                { new StringContent(keepAspectRatio.ToString()), "keepAspectRatio" },
                 { new StreamContent(new MemoryStream(TestPngImage)), "imageFile", "test.png" }
             };
 

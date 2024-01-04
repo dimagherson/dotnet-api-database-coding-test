@@ -1,9 +1,9 @@
-﻿using ImageConverterApi.Models;
+﻿using System.Text.RegularExpressions;
+using ImageConverterApi.Models;
 using ImageConverterApi.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Storage;
-using System.Text.RegularExpressions;
 
 namespace ImageConverterApi.Controllers
 {
@@ -27,8 +27,15 @@ namespace ImageConverterApi.Controllers
         public async Task<IActionResult> Upload([FromForm] ImageUploadModel model, IFormFile imageFile)
         {
             // Validate input
-            if (model.TargetWidth <= 0 || model.TargetHeight <= 0)
+            if (model.KeepAspectRatio && model.TargetWidth <= 0 && model.TargetHeight <= 0)
+            {
                 return BadRequest("Invalid target dimensions");
+            }
+
+            if (!model.KeepAspectRatio && (model.TargetWidth <= 0 || model.TargetHeight <= 0))
+            {
+                return BadRequest("Invalid target dimensions");
+            }
             
             if (string.IsNullOrEmpty(model.TargetFormat) || !Regex.IsMatch(model.TargetFormat, "png|jpeg", RegexOptions.IgnoreCase))
                 return BadRequest("Invalid target format");

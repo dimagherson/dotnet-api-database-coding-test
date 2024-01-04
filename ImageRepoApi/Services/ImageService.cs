@@ -19,7 +19,7 @@ namespace ImageConverterApi.Services
             if (!Enum.TryParse<SKEncodedImageFormat>(model.TargetFormat, true, out var format))
                 throw new ArgumentException($"Invalid image format: {model.TargetFormat}");
             
-            var resizedImage = ResizeImage(imageData, format, model.TargetWidth, model.TargetHeight);
+            var resizedImage = ResizeImage(imageData, format, model.TargetWidth, model.TargetHeight, model.KeepAspectRatio);
             var image = new Image
             {
                 CreatedAt = DateTime.UtcNow,
@@ -37,16 +37,21 @@ namespace ImageConverterApi.Services
         }
 
 
-        private byte[] ResizeImage(Stream sourceImage, SKEncodedImageFormat newFormat, int newWidth, int newHeight)
+        private byte[] ResizeImage(Stream sourceImage, SKEncodedImageFormat newFormat, int newWidth, int newHeight, bool keepAspectRatio)
         {
             using var img = SKImage.FromEncodedData(sourceImage);
-            using var resizedImg = ResizeImage(img, newWidth, newHeight);
+            using var resizedImg = ResizeImage(img, newWidth, newHeight, keepAspectRatio);
             using var data = resizedImg.Encode(newFormat, 100);
             return data.ToArray();
         }
 
-        private SKImage ResizeImage(SKImage sourceImage, int newWidth, int newHeight)
+        private SKImage ResizeImage(SKImage sourceImage, int newWidth, int newHeight, bool keepAspectRatio)
         {
+            if (keepAspectRatio)
+            {
+                (newWidth, newHeight) = DetermineAspectRatioSize(newWidth, newHeight, sourceImage.Width, sourceImage.Height);
+            }
+
             var destRect = new SKRect(0, 0, newWidth, newHeight);
             var srcRect = new SKRect(0, 0, sourceImage.Width, sourceImage.Height);
 
@@ -61,6 +66,22 @@ namespace ImageConverterApi.Services
             g.DrawImage(sourceImage, srcRect, destRect, p);
 
             return SKImage.FromBitmap(result);
+        }
+
+        private (int newWidth, int newHeight) DetermineAspectRatioSize(int targetWidth, int targetHeight, int currentWidth, int currentHeight)
+        {
+            var ratio = currentHeight / (double)currentWidth;
+
+            if (targetWidth > 0)
+            {
+                targetHeight = (int)(targetWidth * ratio);
+            }
+            else
+            {
+                targetWidth = (int)(targetHeight / ratio);
+            }
+
+            return (targetWidth, targetHeight);
         }
     }
 }
