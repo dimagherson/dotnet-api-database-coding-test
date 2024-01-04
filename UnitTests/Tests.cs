@@ -138,5 +138,57 @@ namespace UnitTests
             Assert.AreEqual(System.Net.HttpStatusCode.NotFound, response.StatusCode);
         }
 
+        [TestMethod]
+        public async Task InfoNonExistentImageIdShouldReturn404()
+        {
+            var client = _webApp.CreateClient();
+            var response = await client.GetAsync("/api/image/info?id=00000000-0000-0000-0000-000000000000");
+            Assert.AreEqual(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        }
+
+
+        [TestMethod]
+        public async Task InfoShouldReturnImageInfo()
+        {
+            var client = _webApp.CreateClient();
+            var content = new MultipartFormDataContent
+            {
+                { new StringContent("png"), "targetFormat" },
+                { new StringContent("100"), "targetWidth" },
+                { new StringContent("100"), "targetHeight" },
+                { new StreamContent(new MemoryStream(TestPngImage)), "imageFile", "test.png" }
+            };
+
+            var response = await client.PostAsync("/api/image/upload", content);
+            var responseStr = await response.Content.ReadAsStringAsync();
+            var responseObj = JObject.Parse(responseStr);
+            var imageId = Guid.Parse(responseObj["imageId"]!.ToString());
+
+            response = await client.GetAsync($"/api/image/info?id={imageId}");
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+
+            responseStr = await response.Content.ReadAsStringAsync();
+            Assert.IsFalse(string.IsNullOrWhiteSpace(responseStr));
+
+            responseObj = JObject.Parse(responseStr);
+            Assert.IsNotNull(responseObj);
+            Assert.IsTrue(responseObj.ContainsKey("fileName"));
+            var fileName = responseObj["fileName"]!.ToString();
+            Assert.AreEqual("test.png", fileName);
+            Assert.IsTrue(responseObj.ContainsKey("format"));
+            var format = responseObj["format"]!.ToString();
+            Assert.AreEqual("png", format);
+            Assert.IsTrue(responseObj.ContainsKey("width"));
+            var width = int.Parse(responseObj["width"]!.ToString());
+            Assert.AreEqual(100, width);
+            Assert.IsTrue(responseObj.ContainsKey("height"));
+            var height = int.Parse(responseObj["height"]!.ToString());
+            Assert.AreEqual(100, height);
+            Assert.IsTrue(responseObj.ContainsKey("size"));
+            var size = int.Parse(responseObj["size"]!.ToString());
+            Assert.AreEqual(15027, size);
+            Assert.IsTrue(responseObj.ContainsKey("createdAtUtc"));
+            var createdAtUtc = DateTime.Parse(responseObj["createdAtUtc"]!.ToString());
+        }
     }
 }

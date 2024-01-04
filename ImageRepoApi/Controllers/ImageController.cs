@@ -70,5 +70,24 @@ namespace ImageConverterApi.Controllers
             return File(image.Data, $"image/{image.ImageFormat}");
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Info(Guid id)
+        {
+            var image = await _dbContext.Images.FirstOrDefaultAsync(i => i.ImageId == id);
+
+            if (image == null || image.Data == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(new {
+                image.FileName,
+                format = image.ImageFormat,
+                createdAtUtc = image.CreatedAt.ToUniversalTime(),
+                image.Width,
+                image.Height,
+                size = image.Data.Length
+            });
+        }
     }
 }
