@@ -9,5 +9,6 @@
         public int Height { get; set; }
         public byte[]? Data { get; set; }
         public DateTime CreatedAt { get; set; }
+        public int Hash { get; set; }
     }
 }

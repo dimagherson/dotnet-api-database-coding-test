@@ -94,7 +94,6 @@ namespace UnitTests
             Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         }
 
-
         [DataTestMethod]
         [DataRow("100", "100", false)]
         [DataRow("100", "100", true)]
@@ -122,11 +121,49 @@ namespace UnitTests
             Assert.IsNotNull(responseObj);
             Assert.IsTrue(responseObj.ContainsKey("imageId"));
             var imageId = Guid.Parse(responseObj["imageId"]!.ToString());
+            Assert.IsTrue(responseObj.ContainsKey("alreadyExists"));
+            var alreadyExists = bool.Parse(responseObj["alreadyExists"]!.ToString());
+            Assert.IsFalse(alreadyExists);
 
             using var scope = _webApp.Services.CreateScope();
             using var dbContext = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
             var image = await dbContext.Images.FirstOrDefaultAsync(i => i.ImageId == imageId);
             Assert.IsNotNull(image);
+        }
+
+
+        [TestMethod]
+        public async Task UploadImageShouldNotifyImageAlreadyExists()
+        {
+            var client = _webApp.CreateClient();
+            var content = new MultipartFormDataContent
+            {
+                { new StringContent("png"), "targetFormat" },
+                { new StringContent("100"), "targetWidth" },
+                { new StringContent("100"), "targetHeight" },
+                { new StreamContent(new MemoryStream(TestPngImage)), "imageFile", "test.png" }
+            };
+
+            var response = await client.PostAsync("/api/image/upload", content);
+            var responseStr = await response.Content.ReadAsStringAsync();
+            var responseObj = JObject.Parse(responseStr);
+            var imageId = Guid.Parse(responseObj["imageId"]!.ToString());
+
+            response = await client.PostAsync("/api/image/upload", content);
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+
+            responseStr = await response.Content.ReadAsStringAsync();
+            Assert.IsFalse(string.IsNullOrWhiteSpace(responseStr));
+
+            responseObj = JObject.Parse(responseStr);
+            Assert.IsNotNull(responseObj);
+            Assert.IsTrue(responseObj.ContainsKey("imageId"));
+            var duplicateImageId = Guid.Parse(responseObj["imageId"]!.ToString());
+            Assert.IsTrue(responseObj.ContainsKey("alreadyExists"));
+            var alreadyExists = bool.Parse(responseObj["alreadyExists"]!.ToString());
+            Assert.IsTrue(alreadyExists);
+
+            Assert.AreEqual(imageId, duplicateImageId);
         }
 
 
@@ -189,6 +226,15 @@ namespace UnitTests
             Assert.AreEqual(15027, size);
             Assert.IsTrue(responseObj.ContainsKey("createdAtUtc"));
             var createdAtUtc = DateTime.Parse(responseObj["createdAtUtc"]!.ToString());
+        }
+
+        [TestCleanup]
+        public async Task TestCleanup()
+        {
+            using var scope = _webApp.Services.CreateScope();
+            using var dbContext = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
+            dbContext.Images.RemoveRange(dbContext.Images);
+            await dbContext.SaveChangesAsync();
         }
     }
 }

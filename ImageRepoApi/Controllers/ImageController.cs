@@ -46,13 +46,19 @@ namespace ImageConverterApi.Controllers
 
             // Import the image
             using var fileStream = imageFile.OpenReadStream();
-            var imageId = await _imageService.ImportImage(model, fileStream, imageFile.FileName);
+            var result = await _imageService.ImportImage(model, fileStream, imageFile.FileName);
 
-            // Log the upload
-            _logger.LogInformation($"Uploaded image {imageId} with format {model.TargetFormat} and dimensions {model.TargetWidth}x{model.TargetHeight}");
+            if (result.AlreadyExists)
+            {
+                _logger.LogInformation($"Uploaded image {result.ImageId} with format {model.TargetFormat} and dimensions {model.TargetWidth}x{model.TargetHeight} already exists");
+            }
+            else
+            {
+                // Log the upload
+                _logger.LogInformation($"Uploaded image {result.ImageId} with format {model.TargetFormat} and dimensions {model.TargetWidth}x{model.TargetHeight}");
+            }
 
-            // Return the image ID
-            return Ok(new { imageId = imageId.ToString() });
+            return Ok(new { imageId = result.ImageId.ToString(), result.AlreadyExists });
         }
 
 

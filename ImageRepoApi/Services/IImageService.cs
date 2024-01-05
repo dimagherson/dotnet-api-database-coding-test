@@ -1,9 +1,10 @@
 ﻿using ImageConverterApi.Models;
+using ImageRepoApi.Services;
 
 namespace ImageConverterApi.Services
 {
     public interface IImageService
     {
-        Task<Guid> ImportImage(ImageUploadModel model, Stream imageData, string fileName);
+        Task<ImportImageResult> ImportImage(ImageUploadModel model, Stream imageData, string fileName);
     }
 }

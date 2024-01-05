@@ -1,4 +1,7 @@
-﻿using ImageConverterApi.Models;
+﻿using System.Numerics;
+using ImageConverterApi.Models;
+using ImageRepoApi.Services;
+using Microsoft.EntityFrameworkCore;
 using SkiaSharp;
 using Storage;
 using Storage.Entities;
@@ -14,7 +17,7 @@ namespace ImageConverterApi.Services
             _dbContext = dbContext;
         }
 
-        public async Task<Guid> ImportImage(ImageUploadModel model, Stream imageData, string fileName)
+        public async Task<ImportImageResult> ImportImage(ImageUploadModel model, Stream imageData, string fileName)
         {
             if (!Enum.TryParse<SKEncodedImageFormat>(model.TargetFormat, true, out var format))
                 throw new ArgumentException($"Invalid image format: {model.TargetFormat}");
@@ -27,13 +30,22 @@ namespace ImageConverterApi.Services
                 FileName = fileName,
                 Width = model.TargetWidth,
                 Height = model.TargetHeight,
-                ImageFormat = format.ToString().ToLower()
+                ImageFormat = format.ToString().ToLower(),
+                Hash = new BigInteger(resizedImage).GetHashCode()
             };
+
+            var imagesByHash = await _dbContext.Images.Where(i => i.Hash == image.Hash).ToListAsync();
+            var matchingImage = imagesByHash.FirstOrDefault(i => image.Data.SequenceEqual(i.Data!));
+
+            if (matchingImage != null)
+            {
+                return new ImportImageResult(matchingImage.ImageId, true);
+            }
 
             _dbContext.Images.Add(image);
             await _dbContext.SaveChangesAsync();
 
-            return image.ImageId;
+            return new ImportImageResult(image.ImageId, false);
         }
 
 
@@ -42,6 +54,7 @@ namespace ImageConverterApi.Services
             using var img = SKImage.FromEncodedData(sourceImage);
             using var resizedImg = ResizeImage(img, newWidth, newHeight, keepAspectRatio);
             using var data = resizedImg.Encode(newFormat, 100);
+            
             return data.ToArray();
         }
 
